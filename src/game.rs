@@ -1,7 +1,7 @@
 use colored::*;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -22,8 +22,8 @@ pub struct Piece {
     pub color: Color,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Square(usize);
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Square(pub(crate) usize);
 
 impl Square {
     pub fn new(value: usize) -> Self {
@@ -106,25 +106,26 @@ impl Display for Game {
 
 #[derive(Clone)]
 pub struct Move {
-    from: Square,
-    to: Square,
-    capture: Option<PieceType>,
-    castle: bool,
-    promotion: Option<PieceType>,
-    en_passant_able: bool,
+    pub from: Square,
+    pub to: Square,
+    pub capture: Option<PieceType>,
+    pub castle: bool,
+    pub promotion: Option<PieceType>,
+    pub en_passant_able: bool,
 }
-type RowCol = (i8,i8);
 
-fn rowcol_to_square(to: RowCol) -> Option<Square> {
+type RowCol = (i8, i8);
+
+pub fn rowcol_to_square(to: RowCol) -> Option<Square> {
     let (row, col) = to;
-    if row >= 0 && row < 8 && col >= 0 && col < 8 {
+    if (0..8).contains(&row) && (0..8).contains(&col) {
         Some(Square((row * 8 + col) as usize))
     } else {
         None
     }
 }
 
-fn square_to_rowcol(square: &Square) -> RowCol {
+pub fn square_to_rowcol(square: &Square) -> RowCol {
     ((square.0 / 8) as i8, (square.0 % 8) as i8)
 }
 
@@ -166,13 +167,13 @@ impl Game {
             let to = rowcol_to_square(torow, tocol);
             self.construct_move(from?,to?)
         }*/
-    fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
+    pub fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
         &self.board[square.0]
     }
     fn generic_move(&self, from: &Square, to: RowCol) -> Option<Move> {
         let to = rowcol_to_square(to)?;
         // unwrap is fine here because from should always be valid
-        let color = self.piece_at_square(from).unwrap().color;
+        let color = self.piece_at_square(from).as_ref().unwrap().color;
         let capture = self.piece_at_square(&to);
         match capture {
             None => {
@@ -202,13 +203,14 @@ impl Game {
         }
     }
 
-    fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
+    pub fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
         let piece = self.piece_at_square(&square);
         let mut moves = vec!();
         if let Some(piece_some) = piece {
             let (row, col) = square_to_rowcol(&square);
             match piece_some.piece_type {
                 PieceType::Pawn => {
+                    // TODO: en passant
                     // if to increase row or decrease row
                     let direction: i8 = match piece_some.color {
                         Color::Black => { 1 }
@@ -239,7 +241,7 @@ impl Game {
                     // if directly ahead is empty
                     // unwrap is safe because there's no reason this would ever be invalid
                     let one_ahead = rowcol_to_square((torow, col)).unwrap();
-                    if let None = self.piece_at_square(&one_ahead) {
+                    if self.piece_at_square(&one_ahead).is_none() {
                         pawn_moves.push(Move {
                             from: square,
                             to: one_ahead,
@@ -248,10 +250,11 @@ impl Game {
                             promotion: None,
                             en_passant_able: false,
                         });
-                        // this can only happen if the last square was empty and at initial rows
-                        if (row == 1 && piece_some.color == Color::White) || (row == 6 && piece_some.color == Color::Black) {
+                        // this can only happen if the last square was empty and pawns at initial rows
+                        // pawns cant move backwards nor jump over other pieces
+                        if (row == 6 && piece_some.color == Color::White) || (row == 1 && piece_some.color == Color::Black) {
                             let two_ahead = rowcol_to_square((row + direction * 2, col)).unwrap();
-                            if let None = self.piece_at_square(&one_ahead) {
+                            if self.piece_at_square(&two_ahead).is_none() {
                                 pawn_moves.push(Move {
                                     from: square,
                                     to: two_ahead,
@@ -277,6 +280,7 @@ impl Game {
                     }
                 }
                 PieceType::Knight => {
+                    // knight can move any combination of 2 and 1, positive or negative
                     let mut knight_moves: [RowCol; 8] = [(0, 0); 8];
                     let mut i: usize = 0;
                     for big in [-2i8, 2i8] {
@@ -288,17 +292,66 @@ impl Game {
                         }
                     }
                     for mov in knight_moves {
-                        if let Some(m) = self.generic_move(&square, mov) {
+                        if let Some(m) = self.generic_move(&square, (row + mov.0, col + mov.1)) {
                             moves.push(m);
                         }
                     }
                 }
+                PieceType::King => {
+                    let mut king_moves: [RowCol; 8] = [(0, 0); 8];
+                    let mut i: usize = 0;
+                    for krow in -1i8..2i8 {
+                        for kcol in -1i8..2i8 {
+                            if krow != 0 || kcol != 0 {
+                                king_moves[i] = (krow, kcol);
+                                i += 1;
+                            }
+                        }
+                    }
+                    for mov in king_moves {
+                        if let Some(m) = self.generic_move(&square, (row + mov.0, col + mov.1)) {
+                            moves.push(m);
+                        }
+                    }
+                }
+                // queen, rook, and bishop all move similairly so theyre lumped together
                 _ => {
-
+                    if piece_some.piece_type == PieceType::Rook || piece_some.piece_type == PieceType::Queen {
+                        for (mrow, mcol) in [(1i8, 0i8), (0i8, 1i8), (-1i8, 0i8), (0i8, -1i8)] {
+                            let mut offset = (mrow,mcol);
+                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
+                                let capture = m.capture.is_some();
+                                moves.push(m);
+                                if capture {
+                                    break;
+                                }
+                                offset.0 += mrow;
+                                offset.1 += mcol;
+                            }
+                        }
+                    }
+                    if piece_some.piece_type == PieceType::Bishop || piece_some.piece_type == PieceType::Queen {
+                        for (mrow, mcol) in [(1i8, 1i8), (-1i8, 1i8), (1i8, -1i8), (-1i8, -1i8)] {
+                            let mut offset = (mrow,mcol);
+                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
+                                let capture = m.capture.is_some();
+                                moves.push(m);
+                                if capture {
+                                    break;
+                                }
+                                offset.0 += mrow;
+                                offset.1 += mcol;
+                            }
+                        }
+                    }
                 }
             }
         }
         moves
+    }
+    pub fn make_move(&mut self, from: &Square, to: &Square) {
+        self.board.swap(from.0, to.0);
+        self.board[from.0] = None;
     }
 }
 
@@ -317,7 +370,7 @@ pub fn default_game() -> Game {
     const INIT: Option<Piece> = None;
     let mut game = Game {
         board: [INIT; 64],
-        turn: Color::Black,
+        turn: Color::White,
         castling_rights: CastlingRights {
             white_queenside: true,
             white_kingside: true,
