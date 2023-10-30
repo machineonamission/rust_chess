@@ -1,7 +1,7 @@
 use colored::*;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -11,6 +11,7 @@ pub enum PieceType {
     King,
 }
 
+#[derive(PartialEq, Clone, Copy)]
 pub enum Color {
     Black,
     White,
@@ -21,7 +22,7 @@ pub struct Piece {
     pub color: Color,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Square(usize);
 
 impl Square {
@@ -106,37 +107,123 @@ impl Display for Game {
 pub struct Move {
     from: Square,
     to: Square,
-    capture: Option<Piece>,
+    capture: Option<PieceType>,
     castle: bool,
-    promotion: Option<Piece>,
+    promotion: Option<PieceType>,
 }
 
-fn rowcol_to_square(row: usize, col: usize) -> Square {
-    debug_assert!(row < 8);
-    debug_assert!(col < 8);
-    Square(row * 8 + col)
+fn rowcol_to_square(row: i8, col: i8) -> Option<Square> {
+    if row >= 0 && row < 8 && col >= 0 && col < 8 {
+        Some(Square((row * 8 + col) as usize))
+    } else {
+        None
+    }
 }
 
-fn square_to_rowcol(square: Square) -> (usize, usize) {
-    (square.0 / 8, square.0 % 8)
+fn square_to_rowcol(square: &Square) -> (i8, i8) {
+    ((square.0 / 8) as i8, (square.0 % 8) as i8)
 }
 
 impl Game {
-    fn construct_move(&self, from: Square, to: Square) -> Option<Move> {
-        
+    /*fn construct_move(&self, from: Square, to: Square) -> Option<Move> {
+            let piece;
+            match &self.board[from.0] {
+                None => {
+                    return None
+                }
+                Some(p) => {
+                    piece = p;
+                }
+            }
+            let capture = &self.board[to.0];
+            let capture_type;
+            match capture {
+                None => {
+                    capture_type = None;
+                }
+                Some(p) => {
+                    if piece.color == p.color {
+                        return None;
+                    } else {
+                        capture_type = Some(p.piece_type);
+                    }
+                }
+            }
+            Some(Move {
+                from,
+                to,
+                capture: capture_type,
+                castle: false,
+                promotion: None,
+            })
+        }
+        fn construct_move_from_rowcol(&self, fromrow: i8, fromcol: i8, torow: i8, tocol: i8) -> Option<Move> {
+            let from = rowcol_to_square(fromrow, fromcol);
+            let to = rowcol_to_square(torow, tocol);
+            self.construct_move(from?,to?)
+        }*/
+    fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
+        &self.board[square.0]
     }
+
     fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
-        let piece = &self.board[square.0];
-        let moves = vec!();
-        if let Some(p) = piece {
-            let (row, col) = square_to_rowcol(square);
-            match p.piece_type {
+        let piece = self.piece_at_square(&square);
+        let mut moves = vec!();
+        if let Some(piece_some) = piece {
+            let (row, col) = square_to_rowcol(&square);
+            match piece_some.piece_type {
                 PieceType::Pawn => {
                     // if to increase row or decrease row
-                    let direction = match p.color {
+                    let direction: i8 = match piece_some.color {
                         Color::Black => { 1 }
                         Color::White => { -1 }
                     };
+                    // pawns cant move backwards so i dont need to validate this for color
+                    let promotion = row + direction == 7 || row + direction == 0;
+
+                    let mut moves: Vec<Move> = vec!();
+                    // diagonal captures
+                    for capture_direction in [-1i8, 1i8] {
+                        // if the diagonal is a valid square
+                        if let Some(capture_square) = rowcol_to_square(row + direction, col + capture_direction) {
+                            // if there's a piece on the diagonal
+                            if let Some(capture) = self.piece_at_square(&capture_square) {
+                                // if the piece is captureable
+                                if capture.color != piece_some.color {
+                                    moves.push(Move {
+                                        from: square,
+                                        to: capture_square,
+                                        capture: Some(self.piece_at_square(&capture_square).unwrap().piece_type),
+                                        castle: false,
+                                        promotion: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    // if directly ahead is empty
+                    // unwrap is safe because there's no reason this would ever be invalid
+                    let one_ahead = rowcol_to_square(row + direction, col).unwrap();
+                    if let None = self.piece_at_square(&one_ahead) {
+                        moves.push(Move {
+                            from: square,
+                            to: one_ahead,
+                            capture: None,
+                            castle: false,
+                            promotion: None,
+                        });
+                        if // pawn at starting
+                        let two_ahead = rowcol_to_square(row + direction, col).unwrap();
+                        if let None = self.piece_at_square(&one_ahead) {
+                            moves.push(Move {
+                                from: square,
+                                to: one_ahead,
+                                capture: None,
+                                castle: false,
+                                promotion: None,
+                            });
+                        }
+                    }
                 }
             }
         }
