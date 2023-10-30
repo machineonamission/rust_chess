@@ -104,15 +104,19 @@ impl Display for Game {
     }
 }
 
+#[derive(Clone)]
 pub struct Move {
     from: Square,
     to: Square,
     capture: Option<PieceType>,
     castle: bool,
     promotion: Option<PieceType>,
+    en_passant_able: bool,
 }
+type RowCol = (i8,i8);
 
-fn rowcol_to_square(row: i8, col: i8) -> Option<Square> {
+fn rowcol_to_square(to: RowCol) -> Option<Square> {
+    let (row, col) = to;
     if row >= 0 && row < 8 && col >= 0 && col < 8 {
         Some(Square((row * 8 + col) as usize))
     } else {
@@ -120,7 +124,7 @@ fn rowcol_to_square(row: i8, col: i8) -> Option<Square> {
     }
 }
 
-fn square_to_rowcol(square: &Square) -> (i8, i8) {
+fn square_to_rowcol(square: &Square) -> RowCol {
     ((square.0 / 8) as i8, (square.0 % 8) as i8)
 }
 
@@ -165,6 +169,38 @@ impl Game {
     fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
         &self.board[square.0]
     }
+    fn generic_move(&self, from: &Square, to: RowCol) -> Option<Move> {
+        let to = rowcol_to_square(to)?;
+        // unwrap is fine here because from should always be valid
+        let color = self.piece_at_square(from).unwrap().color;
+        let capture = self.piece_at_square(&to);
+        match capture {
+            None => {
+                Some(Move {
+                    from: *from,
+                    to,
+                    capture: None,
+                    castle: false,
+                    promotion: None,
+                    en_passant_able: false,
+                })
+            }
+            Some(capture_piece) => {
+                if capture_piece.color != color {
+                    Some(Move {
+                        from: *from,
+                        to,
+                        capture: Some(capture_piece.piece_type),
+                        castle: false,
+                        promotion: None,
+                        en_passant_able: false,
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+    }
 
     fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
         let piece = self.piece_at_square(&square);
@@ -178,24 +214,23 @@ impl Game {
                         Color::Black => { 1 }
                         Color::White => { -1 }
                     };
-                    // pawns cant move backwards so i dont need to validate this for color
-                    let promotion = row + direction == 7 || row + direction == 0;
-
-                    let mut moves: Vec<Move> = vec!();
+                    let mut pawn_moves: Vec<Move> = vec!();
+                    let torow = row + direction;
                     // diagonal captures
                     for capture_direction in [-1i8, 1i8] {
                         // if the diagonal is a valid square
-                        if let Some(capture_square) = rowcol_to_square(row + direction, col + capture_direction) {
+                        if let Some(capture_square) = rowcol_to_square((torow, col + capture_direction)) {
                             // if there's a piece on the diagonal
                             if let Some(capture) = self.piece_at_square(&capture_square) {
                                 // if the piece is captureable
                                 if capture.color != piece_some.color {
-                                    moves.push(Move {
+                                    pawn_moves.push(Move {
                                         from: square,
                                         to: capture_square,
-                                        capture: Some(self.piece_at_square(&capture_square).unwrap().piece_type),
+                                        capture: Some(capture.piece_type),
                                         castle: false,
                                         promotion: None,
+                                        en_passant_able: false,
                                     });
                                 }
                             }
@@ -203,27 +238,63 @@ impl Game {
                     }
                     // if directly ahead is empty
                     // unwrap is safe because there's no reason this would ever be invalid
-                    let one_ahead = rowcol_to_square(row + direction, col).unwrap();
+                    let one_ahead = rowcol_to_square((torow, col)).unwrap();
                     if let None = self.piece_at_square(&one_ahead) {
-                        moves.push(Move {
+                        pawn_moves.push(Move {
                             from: square,
                             to: one_ahead,
                             capture: None,
                             castle: false,
                             promotion: None,
+                            en_passant_able: false,
                         });
-                        if // pawn at starting
-                        let two_ahead = rowcol_to_square(row + direction, col).unwrap();
-                        if let None = self.piece_at_square(&one_ahead) {
-                            moves.push(Move {
-                                from: square,
-                                to: one_ahead,
-                                capture: None,
-                                castle: false,
-                                promotion: None,
-                            });
+                        // this can only happen if the last square was empty and at initial rows
+                        if (row == 1 && piece_some.color == Color::White) || (row == 6 && piece_some.color == Color::Black) {
+                            let two_ahead = rowcol_to_square((row + direction * 2, col)).unwrap();
+                            if let None = self.piece_at_square(&one_ahead) {
+                                pawn_moves.push(Move {
+                                    from: square,
+                                    to: two_ahead,
+                                    capture: None,
+                                    castle: false,
+                                    promotion: None,
+                                    en_passant_able: true,
+                                });
+                            }
                         }
                     }
+                    // pawns cant move backwards so i dont need to validate this for color
+                    let promotion = torow == 7 || torow == 0;
+                    for mut mov in pawn_moves {
+                        if promotion {
+                            mov.promotion = Some(PieceType::Queen);
+                            moves.push(mov.clone());
+                            mov.promotion = Some(PieceType::Knight);
+                            moves.push(mov.clone());
+                        } else {
+                            moves.push(mov);
+                        }
+                    }
+                }
+                PieceType::Knight => {
+                    let mut knight_moves: [RowCol; 8] = [(0, 0); 8];
+                    let mut i: usize = 0;
+                    for big in [-2i8, 2i8] {
+                        for small in [-1i8, 1i8] {
+                            knight_moves[i] = (big, small);
+                            i += 1;
+                            knight_moves[i] = (small, big);
+                            i += 1;
+                        }
+                    }
+                    for mov in knight_moves {
+                        if let Some(m) = self.generic_move(&square, mov) {
+                            moves.push(m);
+                        }
+                    }
+                }
+                _ => {
+
                 }
             }
         }

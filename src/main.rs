@@ -35,6 +35,7 @@ async fn main() {
     let white_queen = svg_to_texture::texture_from_file("assets/wQ.svg");
     let white_rook = svg_to_texture::texture_from_file("assets/wR.svg");
     let mut game = game::default_game();
+    let mut moving_piece: Option<usize> = None;
     loop {
         clear_background(BACKGROUND);
         let width = screen_width();
@@ -53,6 +54,12 @@ async fn main() {
                                } else {
                                    DARK_SQUARE
                                });
+                // skip drawing moving piece
+                if let Some(m) = moving_piece {
+                    if m == row + col * 8 {
+                        continue
+                    }
+                }
                 if let Some(p) = &game.board[row + col * 8] {
                     draw_texture_ex(
                         match p.color {
