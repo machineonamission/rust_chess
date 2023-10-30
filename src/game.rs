@@ -52,7 +52,7 @@ pub struct Game {
     pub en_passant_target_square: Option<Square>,
     pub halfmove_clock: u8,
     pub fullmove_number: u16,
-    pub moves: Vec<Move>
+    pub moves: Vec<Move>,
 }
 
 impl Display for Game {
@@ -91,9 +91,9 @@ impl Display for Game {
                 }
             };
             let colored = if index % 2 == (index / 8) % 2 {
-                piecestring.on_truecolor(0xb5,0x88,0x63).black()
+                piecestring.on_truecolor(0xb5, 0x88, 0x63).black()
             } else {
-                piecestring.on_truecolor(0xf0,0xd9,0xb5).black()
+                piecestring.on_truecolor(0xf0, 0xd9, 0xb5).black()
             };
             f.write_fmt(
                 format_args!("{}", colored)
@@ -102,15 +102,45 @@ impl Display for Game {
         Ok(())
     }
 }
-struct Move {
-    from:Square,
-    to:Square,
-    capture:Option<Piece>,
-    castle:bool
-}
-impl Game {
-    fn legal_moves(&self, square: Square) -> Vec<Move> {
 
+pub struct Move {
+    from: Square,
+    to: Square,
+    capture: Option<Piece>,
+    castle: bool,
+    promotion: Option<Piece>,
+}
+
+fn rowcol_to_square(row: usize, col: usize) -> Square {
+    debug_assert!(row < 8);
+    debug_assert!(col < 8);
+    Square(row * 8 + col)
+}
+
+fn square_to_rowcol(square: Square) -> (usize, usize) {
+    (square.0 / 8, square.0 % 8)
+}
+
+impl Game {
+    fn construct_move(&self, from: Square, to: Square) -> Option<Move> {
+        
+    }
+    fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
+        let piece = &self.board[square.0];
+        let moves = vec!();
+        if let Some(p) = piece {
+            let (row, col) = square_to_rowcol(square);
+            match p.piece_type {
+                PieceType::Pawn => {
+                    // if to increase row or decrease row
+                    let direction = match p.color {
+                        Color::Black => { 1 }
+                        Color::White => { -1 }
+                    };
+                }
+            }
+        }
+        moves
     }
 }
 
@@ -139,7 +169,7 @@ pub fn default_game() -> Game {
         en_passant_target_square: None,
         halfmove_clock: 0,
         fullmove_number: 0,
-        moves: vec!()
+        moves: vec!(),
     };
     // initialize top and bottom rows with the starting arrangement
     for (index, piecetype) in INITIAL_ROW.iter().enumerate() {
