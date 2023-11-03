@@ -5,7 +5,6 @@ use glam::{vec2};
 
 use macroquad::prelude::*;
 use crate::game::Color::White;
-use crate::game::square_to_rowcol;
 
 const BACKGROUND: Color = color_u8!(0x16, 0x14, 0x12, 0xff);
 const LIGHT_SQUARE: Color = color_u8!(0xf0, 0xd9, 0xb5, 0xff);
@@ -90,7 +89,7 @@ async fn main() {
         let mouse_pos = mouse_position();
         let row = ((mouse_pos.1 - top_left.1) / square_size).floor() as i8;
         let col = ((mouse_pos.0 - top_left.0) / square_size).floor() as i8;
-        let mouse_square_option = game::rowcol_to_square((row, col));
+        let mouse_square_option = game::is_valid_square(row, col);
 
 
         if let Some(mouse_square) = mouse_square_option {
@@ -134,8 +133,8 @@ async fn main() {
             selected_targets = vec!();
         }
 
-        for col in 0..8 {
-            for row in 0..8 {
+        for row in 0..8 {
+            for col in 0..8 {
                 let mut selected = false;
                 if let Some(m) = selected_piece {
                     if m.0 == row + col * 8 {
@@ -158,7 +157,7 @@ async fn main() {
                                    square_size,
                                    SELECTED);
                 }
-                if let Some(p) = &game.board[row + col * 8] {
+                if let Some(p) = game.piece_at_square(&(row,col)) {
                     // draw moving piece at half opacity
                     let mut color = WHITE;
                     if let Some(m) = moving_piece {
@@ -177,10 +176,9 @@ async fn main() {
             }
         }
         // draw selected squares
-        for sq in &selected_targets {
-            let (row, col) = square_to_rowcol(&sq);
-            let offset = (top_left.0 + col as f32 * square_size, top_left.1 + row as f32 * square_size);
-            if game.piece_at_square(&sq).is_some() { // a piece that can be captured
+        for (row,col) in &selected_targets {
+            let offset = (top_left.0 + *col as f32 * square_size, top_left.1 + *row as f32 * square_size);
+            if game.piece_at_square(&(*row,*col) /* this is horrible */).is_some() { // a piece that can be captured
                 draw_triangle(
                     vec2(offset.0, offset.1),
                     vec2(offset.0 + square_size / 4f32, offset.1),
