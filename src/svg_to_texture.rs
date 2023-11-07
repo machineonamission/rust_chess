@@ -1,8 +1,8 @@
 // modified version of https://github.com/macnelly/quad-svg
 // can't just install the package cause it installs an old version of macroquad and breaks shit
-use std::fs;
 use macroquad::{prelude::ImageFormat, texture::Texture2D};
 use resvg::usvg_text_layout::{fontdb, TreeTextToPath};
+use std::fs;
 
 const SIZE: u32 = 200;
 
@@ -15,9 +15,8 @@ pub fn svg_to_png(svg_str: &str) -> Vec<u8> {
     let mut fontdb = fontdb::Database::new();
     fontdb.load_system_fonts();
     tree.convert_text(&fontdb, opt.keep_named_groups);
-    let pixmap_size = tree.size.to_screen_size();
-    let mut pixmap =
-        resvg::tiny_skia::Pixmap::new(SIZE, SIZE).unwrap();
+    // let pixmap_size = tree.size.to_screen_size();
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(SIZE, SIZE).unwrap();
 
     resvg::render(
         &tree,
@@ -25,7 +24,7 @@ pub fn svg_to_png(svg_str: &str) -> Vec<u8> {
         resvg::tiny_skia::Transform::default(),
         pixmap.as_mut(),
     )
-        .unwrap();
+    .unwrap();
     pixmap.encode_png().unwrap()
 }
 

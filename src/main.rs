@@ -23,6 +23,17 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    let mut king_moves: [(i8,i8); 8] = [(0, 0); 8];
+    let mut i: usize = 0;
+    for krow in -1i8..2i8 {
+        for kcol in -1i8..2i8 {
+            if krow != 0 || kcol != 0 {
+                king_moves[i] = (krow, kcol);
+                i += 1;
+            }
+        }
+    }
+    dbg!(king_moves);
     clear_background(WHITE);
     draw_text("Loading...", screen_width() / 2f32, screen_height() / 2f32, 30f32, BLACK);
     next_frame().await;

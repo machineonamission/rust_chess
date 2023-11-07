@@ -98,8 +98,9 @@ pub struct Move {
     pub capture: Option<PieceType>,
     pub castle: bool,
     pub promotion: Option<PieceType>,
-    pub en_passant_capture: bool, // if the move was en passant
-    pub en_passant_able: bool // if the pawn moved 2 squares
+    pub en_passant_capture: bool,
+    // if the move was en passant
+    pub en_passant_able: bool, // if the pawn moved 2 squares
 }
 
 pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
@@ -114,7 +115,7 @@ pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
 impl Game {
     pub fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
         match is_valid_square(square.0, square.1) {
-            Some((row,col)) => {
+            Some((row, col)) => {
                 &self.board[row as usize][col as usize]
             }
             None => {
@@ -165,7 +166,6 @@ impl Game {
             let (row, col) = square;
             match piece_some.piece_type {
                 PieceType::Pawn => {
-                    // TODO: en passant
                     // if to increase row or decrease row
                     let direction: i8 = match piece_some.color {
                         Color::Black => { 1 }
@@ -191,7 +191,7 @@ impl Game {
                                         en_passant_able: false,
                                     });
                                 }
-                            // no piece but en passant time
+                                // no piece but en passant time
                             } else if Some(capture_square) == self.en_passant_target_square {
                                 pawn_moves.push(Move {
                                     from: square,
@@ -203,7 +203,6 @@ impl Game {
                                     en_passant_able: false,
                                 });
                             }
-
                         }
                     }
                     // if directly ahead is empty
@@ -251,35 +250,37 @@ impl Game {
                     }
                 }
                 PieceType::Knight => {
-                    // knight can move any combination of 2 and 1, positive or negative
-                    let mut knight_moves: [Square; 8] = [(0, 0); 8];
-                    let mut i: usize = 0;
-                    for big in [-2i8, 2i8] {
-                        for small in [-1i8, 1i8] {
-                            knight_moves[i] = (big, small);
-                            i += 1;
-                            knight_moves[i] = (small, big);
-                            i += 1;
-                        }
-                    }
-                    for mov in knight_moves {
+                    // i can generate this dynamically but it's almost certainly faster hardcoded
+                    const KNIGHT_MOVES: [(i8, i8); 8] = [
+                        (-2, -1),
+                        (-1, -2),
+                        (-2, 1),
+                        (1, -2),
+                        (2, -1),
+                        (-1, 2),
+                        (2, 1),
+                        (1, 2),
+                    ];
+                    for mov in KNIGHT_MOVES {
                         if let Some(m) = self.generic_move(&square, (row + mov.0, col + mov.1)) {
                             moves.push(m);
                         }
                     }
                 }
                 PieceType::King => {
-                    let mut king_moves: [Square; 8] = [(0, 0); 8];
-                    let mut i: usize = 0;
-                    for krow in -1i8..2i8 {
-                        for kcol in -1i8..2i8 {
-                            if krow != 0 || kcol != 0 {
-                                king_moves[i] = (krow, kcol);
-                                i += 1;
-                            }
-                        }
-                    }
-                    for mov in king_moves {
+                    // i can generate this dynamically but it's almost certainly faster hardcoded
+                    const KING_MOVES: [(i8, i8); 8] = [
+                        (-1, -1),
+                        (-1, 0),
+                        (-1, 1),
+                        (0, -1),
+                        (0, 1),
+                        (1, -1),
+                        (1, 0),
+                        (1, 1),
+                    ];
+
+                    for mov in KING_MOVES {
                         if let Some(m) = self.generic_move(&square, (row + mov.0, col + mov.1)) {
                             moves.push(m);
                         }
@@ -287,33 +288,28 @@ impl Game {
                 }
                 // queen, rook, and bishop all move similairly so theyre lumped together
                 _ => {
+                    // given a direction, repeatedly move until unable (capture, own piece, edge of board)
+                    let mut repeated_moves_on_direction = |dirs: [(i8, i8); 4]| {
+                        for (mrow, mcol) in dirs {
+                            let mut offset = (mrow, mcol);
+                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
+                                let capture = m.capture.is_some();
+                                moves.push(m);
+                                if capture {
+                                    break;
+                                }
+                                offset.0 += mrow;
+                                offset.1 += mcol;
+                            }
+                        }
+                    };
+                    // rows and files
                     if piece_some.piece_type == PieceType::Rook || piece_some.piece_type == PieceType::Queen {
-                        for (mrow, mcol) in [(1i8, 0i8), (0i8, 1i8), (-1i8, 0i8), (0i8, -1i8)] {
-                            let mut offset = (mrow, mcol);
-                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
-                                let capture = m.capture.is_some();
-                                moves.push(m);
-                                if capture {
-                                    break;
-                                }
-                                offset.0 += mrow;
-                                offset.1 += mcol;
-                            }
-                        }
+                        repeated_moves_on_direction([(1i8, 0i8), (0i8, 1i8), (-1i8, 0i8), (0i8, -1i8)]);
                     }
+                    // diagonals
                     if piece_some.piece_type == PieceType::Bishop || piece_some.piece_type == PieceType::Queen {
-                        for (mrow, mcol) in [(1i8, 1i8), (-1i8, 1i8), (1i8, -1i8), (-1i8, -1i8)] {
-                            let mut offset = (mrow, mcol);
-                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
-                                let capture = m.capture.is_some();
-                                moves.push(m);
-                                if capture {
-                                    break;
-                                }
-                                offset.0 += mrow;
-                                offset.1 += mcol;
-                            }
-                        }
+                        repeated_moves_on_direction([(1i8, 1i8), (-1i8, 1i8), (1i8, -1i8), (-1i8, -1i8)]);
                     }
                 }
             }
