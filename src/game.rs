@@ -41,6 +41,7 @@ pub struct Game {
     pub halfmove_clock: u8,
     pub fullmove_number: u16,
     pub moves: Vec<Move>,
+    pub legal_moves: [[Vec<Move>; 8]; 8]
 }
 
 impl Display for Game {
@@ -87,14 +88,15 @@ pub struct Move {
     pub capture: Option<PieceType>,
     pub castle: bool,
     pub promotion: Option<PieceType>,
-    pub en_passant_capture: bool,
     // if the move was en passant
-    pub en_passant_able: bool, // if the pawn moved 2 squares
+    pub en_passant_capture: Option<Square>,
+    // what square did the pawn double move over
+    pub en_passant_target_square: Option<Square>,
 }
 
-pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
-    if (0i8..8i8).contains(&row) && (0i8..8i8).contains(&col) {
-        Some((row, col))
+pub fn is_valid_square((row,col): &Square) -> Option<Square> {
+    if (0i8..8i8).contains(row) && (0i8..8i8).contains(col) {
+        Some((*row, *col))
     } else {
         None
     }
@@ -102,14 +104,14 @@ pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
 
 impl Game {
     pub fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
-        match is_valid_square(square.0, square.1) {
+        match is_valid_square(square) {
             Some((row, col)) => &self.board[row as usize][col as usize],
             None => &None,
         }
     }
     fn generic_move(&self, from: &Square, to: Square) -> Option<Move> {
         // return no move if invalid
-        is_valid_square(to.0, to.1)?;
+        is_valid_square(&to)?;
         // unwrap is fine here because from should always be valid
         let color = self.piece_at_square(from).as_ref().unwrap().color;
         let capture = self.piece_at_square(&to);
@@ -120,8 +122,8 @@ impl Game {
                 capture: None,
                 castle: false,
                 promotion: None,
-                en_passant_capture: false,
-                en_passant_able: false,
+                en_passant_target_square: None,
+                en_passant_capture: None,
             }),
             Some(capture_piece) => {
                 if capture_piece.color != color {
@@ -131,8 +133,8 @@ impl Game {
                         capture: Some(capture_piece.piece_type),
                         castle: false,
                         promotion: None,
-                        en_passant_capture: false,
-                        en_passant_able: false,
+                        en_passant_target_square: None,
+                        en_passant_capture: None,
                     })
                 } else {
                     None
@@ -140,11 +142,17 @@ impl Game {
             }
         }
     }
+    pub fn legal_moves_on_square(&self, square:Square) -> Vec<Move> {
+        self.legal_moves[square.0 as usize][square.1 as usize].clone()
+    }
 
-    pub fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
+    pub fn compute_legal_moves_on_square(&self, square: Square) -> Vec<Move> {
         let piece = self.piece_at_square(&square);
         let mut moves = vec![];
         if let Some(piece_some) = piece {
+            if piece_some.color != self.turn {
+                return moves
+            }
             let (row, col) = square;
             match piece_some.piece_type {
                 PieceType::Pawn => {
@@ -159,7 +167,7 @@ impl Game {
                     for capture_direction in [-1i8, 1i8] {
                         // if the diagonal is a valid square
                         if let Some(capture_square) =
-                            is_valid_square(torow, col + capture_direction)
+                            is_valid_square(&(torow, col + capture_direction))
                         {
                             // if there's a piece on the diagonal
                             if let Some(capture) = self.piece_at_square(&capture_square) {
@@ -171,8 +179,8 @@ impl Game {
                                         capture: Some(capture.piece_type),
                                         castle: false,
                                         promotion: None,
-                                        en_passant_capture: false,
-                                        en_passant_able: false,
+                                        en_passant_target_square: None,
+                                        en_passant_capture: None,
                                     });
                                 }
                                 // no piece but en passant time
@@ -183,8 +191,8 @@ impl Game {
                                     capture: Some(PieceType::Pawn),
                                     castle: false,
                                     promotion: None,
-                                    en_passant_capture: true,
-                                    en_passant_able: false,
+                                    en_passant_target_square: None,
+                                    en_passant_capture: Some((row, col + capture_direction)),
                                 });
                             }
                         }
@@ -199,8 +207,8 @@ impl Game {
                             capture: None,
                             castle: false,
                             promotion: None,
-                            en_passant_capture: false,
-                            en_passant_able: false,
+                            en_passant_target_square: None,
+                            en_passant_capture: None,
                         });
                         // this can only happen if the last square was empty and pawns at initial rows
                         // pawns cant move backwards nor jump over other pieces
@@ -216,8 +224,8 @@ impl Game {
                                     capture: None,
                                     castle: false,
                                     promotion: None,
-                                    en_passant_capture: false,
-                                    en_passant_able: true,
+                                    en_passant_target_square: Some((row + direction, col)),
+                                    en_passant_capture: None,
                                 });
                             }
                         }
@@ -322,6 +330,53 @@ impl Game {
         self.board[to.0 as usize][to.1 as usize] =
             self.board[from.0 as usize][from.1 as usize].take();
     }
+    pub fn compute_legal_moves(&mut self) {
+        for row in 0i8..8 {
+            for col in 0i8..8 {
+                self.legal_moves[row as usize][col as usize] = self.compute_legal_moves_on_square((row, col))
+            }
+        }
+    }
+    pub fn make_move(&mut self, piece:Piece, mov:Move) {
+        // full move clock
+        if self.turn == Color::Black {
+            self.fullmove_number += 1;
+        }
+        // half move clock
+        if mov.capture.is_some() || piece.piece_type == PieceType::Pawn {
+            self.halfmove_clock = 0;
+        } else {
+            self.halfmove_clock += 1;
+        }
+        // en passant move
+        self.en_passant_target_square = mov.en_passant_target_square;
+        // en passant capture
+        if let Some(c) = mov.en_passant_capture {
+            self.board[c.0 as usize][c.1 as usize] = None;
+        }
+
+        // move the piece
+        self.move_piece(&mov.from, &mov.to);
+        self.turn = match self.turn {
+            Color::Black => Color::White,
+            Color::White => Color::Black
+        };
+        self.compute_legal_moves();
+    }
+    pub fn request_move(&mut self, from:&Square, to:&Square) -> bool {
+        // explicitly reject moving the opponent's pieces because obviously
+        let piece = self.piece_at_square(from).unwrap();
+        if piece.color != self.turn {
+            return false
+        }
+        for mov in self.legal_moves_on_square(*from) {
+            if mov.to == *to {
+                self.make_move(piece, mov);
+                return true
+            }
+        }
+        false
+    }
 }
 
 const INITIAL_ROW: [PieceType; 8] = [
@@ -336,9 +391,9 @@ const INITIAL_ROW: [PieceType; 8] = [
 ];
 
 pub fn default_game() -> Game {
-    const INIT: Option<Piece> = None;
+    const INIT_PIECE: Option<Piece> = None;
     let mut game = Game {
-        board: [[INIT; 8]; 8],
+        board: [[INIT_PIECE; 8]; 8],
         turn: Color::White,
         castling_rights: CastlingRights {
             white_queenside: true,
@@ -349,7 +404,8 @@ pub fn default_game() -> Game {
         en_passant_target_square: None,
         halfmove_clock: 0,
         fullmove_number: 0,
-        moves: vec![],
+        moves: Default::default(),
+        legal_moves: Default::default()
     };
     // initialize top and bottom rows with the starting arrangement
     for (index, piecetype) in INITIAL_ROW.iter().enumerate() {
@@ -373,5 +429,6 @@ pub fn default_game() -> Game {
             color: Color::White,
         });
     }
+    game.compute_legal_moves();
     game
 }

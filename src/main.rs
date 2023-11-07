@@ -22,17 +22,6 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut king_moves: [(i8, i8); 8] = [(0, 0); 8];
-    let mut i: usize = 0;
-    for krow in -1i8..2i8 {
-        for kcol in -1i8..2i8 {
-            if krow != 0 || kcol != 0 {
-                king_moves[i] = (krow, kcol);
-                i += 1;
-            }
-        }
-    }
-    dbg!(king_moves);
     clear_background(WHITE);
     draw_text(
         "Loading...",
@@ -59,7 +48,6 @@ async fn main() {
 
     let mut moving_piece: Option<game::Square> = None;
     let mut selected_piece: Option<game::Square> = None;
-    let mut selected_targets: Vec<game::Square> = vec![];
 
     let draw_piece = |p: &game::Piece, x: f32, y: f32, size: f32, color: Color| {
         draw_texture_ex(
@@ -101,28 +89,27 @@ async fn main() {
         let mouse_pos = mouse_position();
         let row = ((mouse_pos.1 - top_left.1) / square_size).floor() as i8;
         let col = ((mouse_pos.0 - top_left.0) / square_size).floor() as i8;
-        let mouse_square_option = game::is_valid_square(row, col);
+        let mouse_square_option = game::is_valid_square(&(row, col));
 
         if let Some(mouse_square) = mouse_square_option {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(s) = selected_piece {
                     if s != mouse_square {
-                        game.move_piece(&s, &mouse_square);
+                        game.request_move(&s, &mouse_square);
                     }
                     moving_piece = None;
                     selected_piece = None;
-                    selected_targets = vec![];
-                } else if let Some(_) = game.piece_at_square(&mouse_square) {
-                    moving_piece = Some(mouse_square);
-                    selected_piece = Some(mouse_square);
-                    for mov in game.legal_moves_on_square(mouse_square) {
-                        selected_targets.push(mov.to)
+                } else if let Some(p) = game.piece_at_square(&mouse_square) {
+                    if p.color == game.turn {
+                        moving_piece = Some(mouse_square);
+                        selected_piece = Some(mouse_square);
+                    } else {
+                        moving_piece = None;
+                        selected_piece = None;
                     }
-                    selected_targets.dedup();
                 } else {
                     moving_piece = None;
                     selected_piece = None;
-                    selected_targets = vec![];
                 }
             }
             if is_mouse_button_released(MouseButton::Left) {
@@ -131,17 +118,15 @@ async fn main() {
                         moving_piece = None;
                         // intentionally don't touch selected piece
                     } else if let Some(s) = selected_piece {
-                        game.move_piece(&s, &mouse_square);
+                        game.request_move(&s, &mouse_square);
                         moving_piece = None;
                         selected_piece = None;
-                        selected_targets = vec![];
                     }
                 }
             }
         } else if is_mouse_button_released(MouseButton::Left) {
             moving_piece = None;
             selected_piece = None;
-            selected_targets = vec![];
         }
 
         for row in 0..8 {
@@ -176,7 +161,7 @@ async fn main() {
                     // draw moving piece at half opacity
                     let mut color = WHITE;
                     if let Some(m) = moving_piece {
-                        if m.0 == row + col * 8 {
+                        if m == (row, col) {
                             color = color_u8!(0xff, 0xff, 0xff, 0x7f);
                         }
                     }
@@ -191,54 +176,54 @@ async fn main() {
             }
         }
         // draw selected squares
-        for (row, col) in &selected_targets {
-            let offset = (
-                top_left.0 + *col as f32 * square_size,
-                top_left.1 + *row as f32 * square_size,
-            );
-            if game
-                .piece_at_square(&(*row, *col) /* this is horrible */)
-                .is_some()
-            {
-                // a piece that can be captured
-                draw_triangle(
-                    vec2(offset.0, offset.1),
-                    vec2(offset.0 + square_size / 4f32, offset.1),
-                    vec2(offset.0, offset.1 + square_size / 4f32),
-                    SELECTED,
+        if let Some(s) = selected_piece {
+            for mov in game.legal_moves_on_square(s) {
+                let (row,col) = mov.to;
+                let offset = (
+                    top_left.0 + col as f32 * square_size,
+                    top_left.1 + row as f32 * square_size,
                 );
-                draw_triangle(
-                    vec2(offset.0 + square_size, offset.1),
-                    vec2(offset.0 + square_size - square_size / 4f32, offset.1),
-                    vec2(offset.0 + square_size, offset.1 + square_size / 4f32),
-                    SELECTED,
-                );
-                draw_triangle(
-                    vec2(offset.0, offset.1 + square_size),
-                    vec2(offset.0 + square_size / 4f32, offset.1 + square_size),
-                    vec2(offset.0, offset.1 + square_size - square_size / 4f32),
-                    SELECTED,
-                );
-                draw_triangle(
-                    vec2(offset.0 + square_size, offset.1 + square_size),
-                    vec2(
-                        offset.0 + square_size - square_size / 4f32,
-                        offset.1 + square_size,
-                    ),
-                    vec2(
-                        offset.0 + square_size,
-                        offset.1 + square_size - square_size / 4f32,
-                    ),
-                    SELECTED,
-                );
-            } else {
-                // empty square
-                draw_circle(
-                    offset.0 + square_size / 2f32,
-                    offset.1 + square_size / 2f32,
-                    square_size / 10f32,
-                    SELECTED,
-                )
+                if mov.capture.is_some() {
+                    // a capturing move
+                    draw_triangle(
+                        vec2(offset.0, offset.1),
+                        vec2(offset.0 + square_size / 4f32, offset.1),
+                        vec2(offset.0, offset.1 + square_size / 4f32),
+                        SELECTED,
+                    );
+                    draw_triangle(
+                        vec2(offset.0 + square_size, offset.1),
+                        vec2(offset.0 + square_size - square_size / 4f32, offset.1),
+                        vec2(offset.0 + square_size, offset.1 + square_size / 4f32),
+                        SELECTED,
+                    );
+                    draw_triangle(
+                        vec2(offset.0, offset.1 + square_size),
+                        vec2(offset.0 + square_size / 4f32, offset.1 + square_size),
+                        vec2(offset.0, offset.1 + square_size - square_size / 4f32),
+                        SELECTED,
+                    );
+                    draw_triangle(
+                        vec2(offset.0 + square_size, offset.1 + square_size),
+                        vec2(
+                            offset.0 + square_size - square_size / 4f32,
+                            offset.1 + square_size,
+                        ),
+                        vec2(
+                            offset.0 + square_size,
+                            offset.1 + square_size - square_size / 4f32,
+                        ),
+                        SELECTED,
+                    );
+                } else {
+                    // empty square
+                    draw_circle(
+                        offset.0 + square_size / 2f32,
+                        offset.1 + square_size / 2f32,
+                        square_size / 10f32,
+                        SELECTED,
+                    )
+                }
             }
         }
 
