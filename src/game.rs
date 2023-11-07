@@ -26,7 +26,6 @@ pub struct Piece {
 // (row, col)
 pub type Square = (i8, i8);
 
-
 pub struct CastlingRights {
     pub white_queenside: bool,
     pub white_kingside: bool,
@@ -49,42 +48,32 @@ impl Display for Game {
         for (row, prow) in self.board.iter().enumerate() {
             for (col, piece) in prow.iter().enumerate() {
                 let piecestring = match piece {
-                    Some(p) => {
-                        match p.color {
-                            Color::Black => {
-                                match p.piece_type {
-                                    PieceType::Pawn => { "p" }
-                                    PieceType::Knight => { "n" }
-                                    PieceType::Bishop => { "b" }
-                                    PieceType::Rook => { "r" }
-                                    PieceType::Queen => { "q" }
-                                    PieceType::King => { "k" }
-                                }
-                            }
-                            Color::White => {
-                                match p.piece_type {
-                                    PieceType::Pawn => { "P" }
-                                    PieceType::Knight => { "N" }
-                                    PieceType::Bishop => { "B" }
-                                    PieceType::Rook => { "R" }
-                                    PieceType::Queen => { "Q" }
-                                    PieceType::King => { "K" }
-                                }
-                            }
-                        }
-                    }
-                    None => {
-                        " "
-                    }
+                    Some(p) => match p.color {
+                        Color::Black => match p.piece_type {
+                            PieceType::Pawn => "p",
+                            PieceType::Knight => "n",
+                            PieceType::Bishop => "b",
+                            PieceType::Rook => "r",
+                            PieceType::Queen => "q",
+                            PieceType::King => "k",
+                        },
+                        Color::White => match p.piece_type {
+                            PieceType::Pawn => "P",
+                            PieceType::Knight => "N",
+                            PieceType::Bishop => "B",
+                            PieceType::Rook => "R",
+                            PieceType::Queen => "Q",
+                            PieceType::King => "K",
+                        },
+                    },
+                    None => " ",
                 };
                 let colored = if row % 2 == col % 2 {
                     piecestring.on_truecolor(0xb5, 0x88, 0x63).black()
                 } else {
                     piecestring.on_truecolor(0xf0, 0xd9, 0xb5).black()
                 };
-                f.write_fmt(
-                    format_args!("{}", colored)
-                )?;
+                f.write_fmt(format_args!("{}", colored))?;
             }
         }
         Ok(())
@@ -111,16 +100,11 @@ pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
     }
 }
 
-
 impl Game {
     pub fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
         match is_valid_square(square.0, square.1) {
-            Some((row, col)) => {
-                &self.board[row as usize][col as usize]
-            }
-            None => {
-                &None
-            }
+            Some((row, col)) => &self.board[row as usize][col as usize],
+            None => &None,
         }
     }
     fn generic_move(&self, from: &Square, to: Square) -> Option<Move> {
@@ -130,17 +114,15 @@ impl Game {
         let color = self.piece_at_square(from).as_ref().unwrap().color;
         let capture = self.piece_at_square(&to);
         match capture {
-            None => {
-                Some(Move {
-                    from: *from,
-                    to,
-                    capture: None,
-                    castle: false,
-                    promotion: None,
-                    en_passant_capture: false,
-                    en_passant_able: false,
-                })
-            }
+            None => Some(Move {
+                from: *from,
+                to,
+                capture: None,
+                castle: false,
+                promotion: None,
+                en_passant_capture: false,
+                en_passant_able: false,
+            }),
             Some(capture_piece) => {
                 if capture_piece.color != color {
                     Some(Move {
@@ -161,22 +143,24 @@ impl Game {
 
     pub fn legal_moves_on_square(&self, square: Square) -> Vec<Move> {
         let piece = self.piece_at_square(&square);
-        let mut moves = vec!();
+        let mut moves = vec![];
         if let Some(piece_some) = piece {
             let (row, col) = square;
             match piece_some.piece_type {
                 PieceType::Pawn => {
                     // if to increase row or decrease row
                     let direction: i8 = match piece_some.color {
-                        Color::Black => { 1 }
-                        Color::White => { -1 }
+                        Color::Black => 1,
+                        Color::White => -1,
                     };
-                    let mut pawn_moves: Vec<Move> = vec!();
+                    let mut pawn_moves: Vec<Move> = vec![];
                     let torow = row + direction;
                     // diagonal captures
                     for capture_direction in [-1i8, 1i8] {
                         // if the diagonal is a valid square
-                        if let Some(capture_square) = is_valid_square(torow, col + capture_direction) {
+                        if let Some(capture_square) =
+                            is_valid_square(torow, col + capture_direction)
+                        {
                             // if there's a piece on the diagonal
                             if let Some(capture) = self.piece_at_square(&capture_square) {
                                 // if the piece is captureable
@@ -220,7 +204,9 @@ impl Game {
                         });
                         // this can only happen if the last square was empty and pawns at initial rows
                         // pawns cant move backwards nor jump over other pieces
-                        if (row == 6 && piece_some.color == Color::White) || (row == 1 && piece_some.color == Color::Black) {
+                        if (row == 6 && piece_some.color == Color::White)
+                            || (row == 1 && piece_some.color == Color::Black)
+                        {
                             // always valid square
                             let two_ahead = (row + direction * 2, col);
                             if self.piece_at_square(&two_ahead).is_none() {
@@ -292,7 +278,9 @@ impl Game {
                     let mut repeated_moves_on_direction = |dirs: [(i8, i8); 4]| {
                         for (mrow, mcol) in dirs {
                             let mut offset = (mrow, mcol);
-                            while let Some(m) = self.generic_move(&square, (row + offset.0, col + offset.1)) {
+                            while let Some(m) =
+                                self.generic_move(&square, (row + offset.0, col + offset.1))
+                            {
                                 let capture = m.capture.is_some();
                                 moves.push(m);
                                 if capture {
@@ -304,12 +292,26 @@ impl Game {
                         }
                     };
                     // rows and files
-                    if piece_some.piece_type == PieceType::Rook || piece_some.piece_type == PieceType::Queen {
-                        repeated_moves_on_direction([(1i8, 0i8), (0i8, 1i8), (-1i8, 0i8), (0i8, -1i8)]);
+                    if piece_some.piece_type == PieceType::Rook
+                        || piece_some.piece_type == PieceType::Queen
+                    {
+                        repeated_moves_on_direction([
+                            (1i8, 0i8),
+                            (0i8, 1i8),
+                            (-1i8, 0i8),
+                            (0i8, -1i8),
+                        ]);
                     }
                     // diagonals
-                    if piece_some.piece_type == PieceType::Bishop || piece_some.piece_type == PieceType::Queen {
-                        repeated_moves_on_direction([(1i8, 1i8), (-1i8, 1i8), (1i8, -1i8), (-1i8, -1i8)]);
+                    if piece_some.piece_type == PieceType::Bishop
+                        || piece_some.piece_type == PieceType::Queen
+                    {
+                        repeated_moves_on_direction([
+                            (1i8, 1i8),
+                            (-1i8, 1i8),
+                            (1i8, -1i8),
+                            (-1i8, -1i8),
+                        ]);
                     }
                 }
             }
@@ -317,7 +319,8 @@ impl Game {
         moves
     }
     pub fn move_piece(&mut self, from: &Square, to: &Square) {
-        self.board[to.0 as usize][to.1 as usize] = self.board[from.0 as usize][from.1 as usize].take();
+        self.board[to.0 as usize][to.1 as usize] =
+            self.board[from.0 as usize][from.1 as usize].take();
     }
 }
 
@@ -329,7 +332,7 @@ const INITIAL_ROW: [PieceType; 8] = [
     PieceType::King,
     PieceType::Bishop,
     PieceType::Knight,
-    PieceType::Rook
+    PieceType::Rook,
 ];
 
 pub fn default_game() -> Game {
@@ -346,7 +349,7 @@ pub fn default_game() -> Game {
         en_passant_target_square: None,
         halfmove_clock: 0,
         fullmove_number: 0,
-        moves: vec!(),
+        moves: vec![],
     };
     // initialize top and bottom rows with the starting arrangement
     for (index, piecetype) in INITIAL_ROW.iter().enumerate() {
