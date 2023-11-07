@@ -98,7 +98,8 @@ pub struct Move {
     pub capture: Option<PieceType>,
     pub castle: bool,
     pub promotion: Option<PieceType>,
-    pub en_passant_able: bool,
+    pub en_passant_capture: bool, // if the move was en passant
+    pub en_passant_able: bool // if the pawn moved 2 squares
 }
 
 pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
@@ -112,9 +113,18 @@ pub fn is_valid_square(row: i8, col: i8) -> Option<Square> {
 
 impl Game {
     pub fn piece_at_square(&self, square: &Square) -> &Option<Piece> {
-        &self.board[square.0 as usize][square.1 as usize]
+        match is_valid_square(square.0, square.1) {
+            Some((row,col)) => {
+                &self.board[row as usize][col as usize]
+            }
+            None => {
+                &None
+            }
+        }
     }
     fn generic_move(&self, from: &Square, to: Square) -> Option<Move> {
+        // return no move if invalid
+        is_valid_square(to.0, to.1)?;
         // unwrap is fine here because from should always be valid
         let color = self.piece_at_square(from).as_ref().unwrap().color;
         let capture = self.piece_at_square(&to);
@@ -126,6 +136,7 @@ impl Game {
                     capture: None,
                     castle: false,
                     promotion: None,
+                    en_passant_capture: false,
                     en_passant_able: false,
                 })
             }
@@ -137,6 +148,7 @@ impl Game {
                         capture: Some(capture_piece.piece_type),
                         castle: false,
                         promotion: None,
+                        en_passant_capture: false,
                         en_passant_able: false,
                     })
                 } else {
@@ -175,10 +187,23 @@ impl Game {
                                         capture: Some(capture.piece_type),
                                         castle: false,
                                         promotion: None,
+                                        en_passant_capture: false,
                                         en_passant_able: false,
                                     });
                                 }
+                            // no piece but en passant time
+                            } else if Some(capture_square) == self.en_passant_target_square {
+                                pawn_moves.push(Move {
+                                    from: square,
+                                    to: capture_square,
+                                    capture: Some(PieceType::Pawn),
+                                    castle: false,
+                                    promotion: None,
+                                    en_passant_capture: true,
+                                    en_passant_able: false,
+                                });
                             }
+
                         }
                     }
                     // if directly ahead is empty
@@ -191,6 +216,7 @@ impl Game {
                             capture: None,
                             castle: false,
                             promotion: None,
+                            en_passant_capture: false,
                             en_passant_able: false,
                         });
                         // this can only happen if the last square was empty and pawns at initial rows
@@ -205,6 +231,7 @@ impl Game {
                                     capture: None,
                                     castle: false,
                                     promotion: None,
+                                    en_passant_capture: false,
                                     en_passant_able: true,
                                 });
                             }
@@ -293,7 +320,7 @@ impl Game {
         }
         moves
     }
-    pub fn make_move(&mut self, from: &Square, to: &Square) {
+    pub fn move_piece(&mut self, from: &Square, to: &Square) {
         self.board[to.0 as usize][to.1 as usize] = self.board[from.0 as usize][from.1 as usize].take();
     }
 }
@@ -328,11 +355,11 @@ pub fn default_game() -> Game {
     // initialize top and bottom rows with the starting arrangement
     for (index, piecetype) in INITIAL_ROW.iter().enumerate() {
         game.board[0][index] = Some(Piece {
-            piece_type: piecetype.clone(),
+            piece_type: *piecetype,
             color: Color::Black,
         });
         game.board[7][index] = Some(Piece {
-            piece_type: piecetype.clone(),
+            piece_type: *piecetype,
             color: Color::White,
         });
     }

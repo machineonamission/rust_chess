@@ -96,7 +96,7 @@ async fn main() {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(s) = selected_piece {
                     if s != mouse_square {
-                        game.make_move(&s, &mouse_square);
+                        game.move_piece(&s, &mouse_square);
                     }
                     moving_piece = None;
                     selected_piece = None;
@@ -120,7 +120,7 @@ async fn main() {
                         moving_piece = None;
                         // intentionally don't touch selected piece
                     } else if let Some(s) = selected_piece {
-                        game.make_move(&s, &mouse_square);
+                        game.move_piece(&s, &mouse_square);
                         moving_piece = None;
                         selected_piece = None;
                         selected_targets = vec!();
@@ -137,12 +137,12 @@ async fn main() {
             for col in 0..8 {
                 let mut selected = false;
                 if let Some(m) = selected_piece {
-                    if m.0 == row + col * 8 {
+                    if m == (row,col) {
                         selected = true;
                     }
                 }
-                draw_rectangle(top_left.0 + row as f32 * square_size,
-                               top_left.1 + col as f32 * square_size,
+                draw_rectangle(top_left.0 + col as f32 * square_size,
+                               top_left.1 + row as f32 * square_size,
                                square_size,
                                square_size,
                                if row % 2 == col % 2 {
@@ -151,8 +151,8 @@ async fn main() {
                                    DARK_SQUARE
                                });
                 if selected {
-                    draw_rectangle(top_left.0 + row as f32 * square_size,
-                                   top_left.1 + col as f32 * square_size,
+                    draw_rectangle(top_left.0 + col as f32 * square_size,
+                                   top_left.1 + row as f32 * square_size,
                                    square_size,
                                    square_size,
                                    SELECTED);
@@ -167,8 +167,8 @@ async fn main() {
                     }
                     draw_piece(
                         p,
-                        top_left.0 + row as f32 * square_size,
-                        top_left.1 + col as f32 * square_size,
+                        top_left.0 + col as f32 * square_size,
+                        top_left.1 + row as f32 * square_size,
                         square_size,
                         color,
                     );
