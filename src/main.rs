@@ -44,7 +44,7 @@ async fn main() {
     let white_queen = svg_to_texture::texture_from_file("assets/wQ.svg");
     let white_rook = svg_to_texture::texture_from_file("assets/wR.svg");
 
-    let mut game = game::default_game();
+    let mut game = game::Game::default();
 
     let mut moving_piece: Option<game::Square> = None;
     let mut selected_piece: Option<game::Square> = None;
@@ -178,7 +178,7 @@ async fn main() {
         // draw selected squares
         if let Some(s) = selected_piece {
             for mov in game.legal_moves_on_square(s) {
-                let (row,col) = mov.to;
+                let (row, col) = mov.to;
                 let offset = (
                     top_left.0 + col as f32 * square_size,
                     top_left.1 + row as f32 * square_size,
