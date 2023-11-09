@@ -12,7 +12,7 @@ pub enum PieceType {
     King,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Castling {
     BlackKingside,
     BlackQueenside,
@@ -24,6 +24,15 @@ pub enum Castling {
 pub enum Color {
     Black,
     White,
+}
+
+impl Color {
+    pub fn invert(&self) -> Self {
+        match self {
+            Color::Black => Color::White,
+            Color::White => Color::Black,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -102,7 +111,7 @@ impl Display for Game {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Move {
     pub from: Square,
     pub to: Square,
@@ -378,11 +387,15 @@ impl Game {
                                         Color::Black => {
                                             if row == 0 {
                                                 match col {
-                                                    0 => m.losing_castle_rights.black_queenside =
-                                                        self.castling_rights.black_queenside,
+                                                    0 => {
+                                                        m.losing_castle_rights.black_queenside =
+                                                            self.castling_rights.black_queenside
+                                                    }
 
-                                                    7 => m.losing_castle_rights.black_kingside =
-                                                        self.castling_rights.black_kingside,
+                                                    7 => {
+                                                        m.losing_castle_rights.black_kingside =
+                                                            self.castling_rights.black_kingside
+                                                    }
 
                                                     _ => {}
                                                 }
@@ -391,11 +404,15 @@ impl Game {
                                         Color::White => {
                                             if row == 7 && (col == 0 || col == 7) {
                                                 match col {
-                                                    0 => m.losing_castle_rights.white_queenside =
-                                                        self.castling_rights.white_queenside,
+                                                    0 => {
+                                                        m.losing_castle_rights.white_queenside =
+                                                            self.castling_rights.white_queenside
+                                                    }
 
-                                                    7 => m.losing_castle_rights.white_kingside =
-                                                        self.castling_rights.white_kingside,
+                                                    7 => {
+                                                        m.losing_castle_rights.white_kingside =
+                                                            self.castling_rights.white_kingside
+                                                    }
                                                     _ => {}
                                                 }
                                             }
@@ -443,17 +460,55 @@ impl Game {
         self.board[to.0 as usize][to.1 as usize] =
             self.board[from.0 as usize][from.1 as usize].take();
     }
-    fn compute_legal_moves(&mut self) {
-        println!("Computing moves...");
-        let now = Instant::now();
-        for row in 0i8..8 {
-            for col in 0i8..8 {
-                self.legal_moves[row as usize][col as usize] =
-                    self.compute_legal_moves_on_square((row, col))
+    fn any_king_captures(&self) -> bool {
+        for row2 in 0i8..8 {
+            for col2 in 0i8..8 {
+                for mv2 in self.legal_moves_on_square((row2, col2)) {
+                    if let Some(c) = mv2.capture {
+                        if c == PieceType::King {
+                            return true
+                        }
+                    }
+                }
             }
         }
-        let elapsed = now.elapsed();
-        println!("Move computing took {:?}", elapsed);
+        false
+    }
+    fn validate_move(&mut self, mov: &Move) -> bool {
+        self.make_move(mov);
+        self.compute_legal_moves(false);
+        let caps = self.any_king_captures();
+        self.unmake_move();
+        self.compute_legal_moves(false);
+        // if caps {
+        //     dbg!(mov);
+        // }
+        !caps
+    }
+    fn compute_legal_moves(&mut self, validate_king_moves:bool) {
+        let now = Instant::now();
+        let mut legal_moves: [[Vec<Move>; 8]; 8] = Default::default();
+        for row in 0i8..8 {
+            for col in 0i8..8 {
+                // compute moves normally
+                let mut square_legal_moves = self.compute_legal_moves_on_square((row,col));
+
+                if validate_king_moves {
+                    let before = square_legal_moves.len();
+                    square_legal_moves.retain(|m| self.validate_move(m));
+                    // println!("{} {}", before, legal_moves.len());
+                }
+
+                legal_moves[row as usize][col as usize] = square_legal_moves;
+            }
+        }
+        self.legal_moves = legal_moves;
+
+        if validate_king_moves {
+            let elapsed = now.elapsed();
+            println!("Move computing took {:?}", elapsed);
+        }
+
     }
     fn make_move(&mut self, mov: &Move) {
         let piece = self.piece_at_square(&mov.from).unwrap();
@@ -498,18 +553,81 @@ impl Game {
         // push move
         self.moves.push(mov.clone());
         // update turn
-        self.turn = match self.turn {
-            Color::Black => Color::White,
-            Color::White => Color::Black,
-        };
+        self.turn = self.turn.invert();
+    }
+    fn unmake_move(&mut self) -> bool {
+        let last_mov = self.moves.pop();
+        if last_mov.is_none() {
+            return false;
+        }
+        self.turn = self.turn.invert();
+        let mov = last_mov.unwrap();
+        self.move_piece(&mov.to, &mov.from);
+
+        // full move clock
+        if self.turn == Color::Black {
+            self.fullmove_number -= 1;
+        }
+        // half move clock
+        // TODO
+        // if mov.capture.is_some() || piece.piece_type == PieceType::Pawn {
+        //     self.halfmove_clock = 0;
+        // } else {
+        //     self.halfmove_clock += 1;
+        // }
+        // en passant move
+        let last_move = self.moves.last();
+        if let Some(lm) = last_move {
+            self.en_passant_target_square = lm.en_passant_target_square;
+        } else {
+            self.en_passant_target_square = None;
+        }
+
+        // en passant capture
+        if let Some(c) = mov.en_passant_capture {
+            self.board[c.0 as usize][c.1 as usize] = Some(Piece {
+                piece_type: PieceType::Pawn,
+                color: self.turn.invert(),
+            });
+        } else if let Some(c) = mov.capture {
+            self.board[mov.to.0 as usize][mov.to.1 as usize] = Some(Piece {
+                piece_type: c,
+                color: self.turn.invert(),
+            });
+        }
+        // castling rook
+        if let Some(c) = mov.castle {
+            match c {
+                Castling::BlackKingside => self.move_piece(&(0i8, 5i8), &(0i8, 7i8)),
+                Castling::BlackQueenside => self.move_piece(&(0i8, 3i8), &(0i8, 0i8)),
+                Castling::WhiteKingside => self.move_piece(&(7i8, 5i8), &(7i8, 7i8)),
+                Castling::WhiteQueenside => self.move_piece(&(7i8, 3i8), &(7i8, 0i8)),
+            }
+        }
+        // castling rights
+        self.castling_rights.black_queenside |= mov.losing_castle_rights.black_queenside;
+        self.castling_rights.black_kingside |= mov.losing_castle_rights.black_kingside;
+        self.castling_rights.white_queenside |= mov.losing_castle_rights.white_queenside;
+        self.castling_rights.white_kingside |= mov.losing_castle_rights.white_kingside;
+        // promotion
+        if mov.promotion.is_some() {
+            self.board[mov.from.0 as usize][mov.from.1 as usize]
+                .unwrap()
+                .piece_type = PieceType::Pawn;
+        }
+        true
+    }
+    pub fn unmake_move_and_recalculate(&mut self) {
+        self.unmake_move();
         // recompute legal moves
-        self.compute_legal_moves();
+        self.compute_legal_moves(true);
     }
     pub fn request_move(&mut self, from: &Square, to: &Square) -> bool {
         // clone here because I can't borrow self in self.legal_moves_on_square and self.make_move
         for mov in self.legal_moves_on_square(*from).clone() {
             if mov.to == *to {
                 self.make_move(&mov);
+                self.compute_legal_moves(true);
                 return true;
             }
         }
@@ -563,7 +681,7 @@ impl Default for Game {
                 color: Color::White,
             });
         }
-        game.compute_legal_moves();
+        game.compute_legal_moves(true);
         game
     }
 }

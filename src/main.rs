@@ -6,11 +6,30 @@ use glam::vec2;
 use crate::game::Color::White;
 use macroquad::prelude::*;
 
+use std::str;
+
 const BACKGROUND: Color = color_u8!(0x16, 0x14, 0x12, 0xff);
 const LIGHT_SQUARE: Color = color_u8!(0xf0, 0xd9, 0xb5, 0xff);
 const DARK_SQUARE: Color = color_u8!(0xb5, 0x88, 0x63, 0xff);
 
 const SELECTED: Color = color_u8!(20, 85, 30, 0x7f);
+
+const FONT: &[u8] = include_bytes!("../assets/Atkinson-Hyperlegible-Bold-102.ttf");
+
+
+const BLACK_BISHOP_FILE: &[u8] = include_bytes!("../assets/bB.svg");
+const BLACK_KING_FILE: &[u8] = include_bytes!("../assets/bK.svg");
+const BLACK_KNIGHT_FILE: &[u8] = include_bytes!("../assets/bN.svg");
+const BLACK_PAWN_FILE: &[u8] = include_bytes!("../assets/bP.svg");
+const BLACK_QUEEN_FILE: &[u8] = include_bytes!("../assets/bQ.svg");
+const BLACK_ROOK_FILE: &[u8] = include_bytes!("../assets/bR.svg");
+const WHITE_BISHOP_FILE: &[u8] = include_bytes!("../assets/wB.svg");
+const WHITE_KING_FILE: &[u8] = include_bytes!("../assets/wK.svg");
+const WHITE_KNIGHT_FILE: &[u8] = include_bytes!("../assets/wN.svg");
+const WHITE_PAWN_FILE: &[u8] = include_bytes!("../assets/wP.svg");
+const WHITE_QUEEN_FILE: &[u8] = include_bytes!("../assets/wQ.svg");
+const WHITE_ROOK_FILE: &[u8] = include_bytes!("../assets/wR.svg");
+
 
 fn window_conf() -> Conf {
     Conf {
@@ -23,26 +42,32 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     clear_background(WHITE);
-    draw_text(
+    let font = load_ttf_font_from_bytes(FONT).unwrap();
+    draw_text_ex(
         "Loading...",
         screen_width() / 2f32,
         screen_height() / 2f32,
-        30f32,
-        BLACK,
+        TextParams {
+            font_size: 32,
+            color: BLACK,
+            font:Some(&font),
+            ..Default::default()
+        },
     );
     next_frame().await;
-    let black_bishop = svg_to_texture::texture_from_file("assets/bB.svg");
-    let black_king = svg_to_texture::texture_from_file("assets/bK.svg");
-    let black_knight = svg_to_texture::texture_from_file("assets/bN.svg");
-    let black_pawn = svg_to_texture::texture_from_file("assets/bP.svg");
-    let black_queen = svg_to_texture::texture_from_file("assets/bQ.svg");
-    let black_rook = svg_to_texture::texture_from_file("assets/bR.svg");
-    let white_bishop = svg_to_texture::texture_from_file("assets/wB.svg");
-    let white_king = svg_to_texture::texture_from_file("assets/wK.svg");
-    let white_knight = svg_to_texture::texture_from_file("assets/wN.svg");
-    let white_pawn = svg_to_texture::texture_from_file("assets/wP.svg");
-    let white_queen = svg_to_texture::texture_from_file("assets/wQ.svg");
-    let white_rook = svg_to_texture::texture_from_file("assets/wR.svg");
+
+    let black_bishop: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_BISHOP_FILE).unwrap());
+    let black_king: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KING_FILE).unwrap());
+    let black_knight: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KNIGHT_FILE).unwrap());
+    let black_pawn: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_PAWN_FILE).unwrap());
+    let black_queen: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_QUEEN_FILE).unwrap());
+    let black_rook: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_ROOK_FILE).unwrap());
+    let white_bishop: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_BISHOP_FILE).unwrap());
+    let white_king: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KING_FILE).unwrap());
+    let white_knight: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KNIGHT_FILE).unwrap());
+    let white_pawn: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_PAWN_FILE).unwrap());
+    let white_queen: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_QUEEN_FILE).unwrap());
+    let white_rook: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_ROOK_FILE).unwrap());
 
     let mut game = game::Game::default();
 
@@ -90,6 +115,10 @@ async fn main() {
         let row = ((mouse_pos.1 - top_left.1) / square_size).floor() as i8;
         let col = ((mouse_pos.0 - top_left.0) / square_size).floor() as i8;
         let mouse_square_option = game::is_valid_square(&(row, col));
+
+        if is_key_pressed(KeyCode::Z) {
+            game.unmake_move_and_recalculate();
+        }
 
         if let Some(mouse_square) = mouse_square_option {
             if is_mouse_button_pressed(MouseButton::Left) {

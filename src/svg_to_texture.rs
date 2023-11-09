@@ -35,7 +35,3 @@ pub fn svg_to_texture(svg_str: &str) -> Texture2D {
     let png_data = svg_to_png(&svg_str);
     Texture2D::from_file_with_format(&png_data, Some(ImageFormat::Png))
 }
-
-pub fn texture_from_file(file: &str) -> Texture2D {
-    svg_to_texture(fs::read_to_string(file).unwrap().as_str())
-}
