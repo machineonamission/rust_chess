@@ -16,7 +16,6 @@ const SELECTED: Color = color_u8!(20, 85, 30, 0x7f);
 
 const FONT: &[u8] = include_bytes!("../assets/Atkinson-Hyperlegible-Bold-102.ttf");
 
-
 const BLACK_BISHOP_FILE: &[u8] = include_bytes!("../assets/bB.svg");
 const BLACK_KING_FILE: &[u8] = include_bytes!("../assets/bK.svg");
 const BLACK_KNIGHT_FILE: &[u8] = include_bytes!("../assets/bN.svg");
@@ -29,7 +28,6 @@ const WHITE_KNIGHT_FILE: &[u8] = include_bytes!("../assets/wN.svg");
 const WHITE_PAWN_FILE: &[u8] = include_bytes!("../assets/wP.svg");
 const WHITE_QUEEN_FILE: &[u8] = include_bytes!("../assets/wQ.svg");
 const WHITE_ROOK_FILE: &[u8] = include_bytes!("../assets/wR.svg");
-
 
 fn window_conf() -> Conf {
     Conf {
@@ -50,24 +48,36 @@ async fn main() {
         TextParams {
             font_size: 32,
             color: BLACK,
-            font:Some(&font),
+            font: Some(&font),
             ..Default::default()
         },
     );
     next_frame().await;
 
-    let black_bishop: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_BISHOP_FILE).unwrap());
-    let black_king: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KING_FILE).unwrap());
-    let black_knight: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KNIGHT_FILE).unwrap());
-    let black_pawn: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_PAWN_FILE).unwrap());
-    let black_queen: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_QUEEN_FILE).unwrap());
-    let black_rook: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(BLACK_ROOK_FILE).unwrap());
-    let white_bishop: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_BISHOP_FILE).unwrap());
-    let white_king: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KING_FILE).unwrap());
-    let white_knight: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KNIGHT_FILE).unwrap());
-    let white_pawn: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_PAWN_FILE).unwrap());
-    let white_queen: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_QUEEN_FILE).unwrap());
-    let white_rook: Texture2D = svg_to_texture::svg_to_texture(str::from_utf8(WHITE_ROOK_FILE).unwrap());
+    let black_bishop: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_BISHOP_FILE).unwrap());
+    let black_king: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KING_FILE).unwrap());
+    let black_knight: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KNIGHT_FILE).unwrap());
+    let black_pawn: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_PAWN_FILE).unwrap());
+    let black_queen: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_QUEEN_FILE).unwrap());
+    let black_rook: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_ROOK_FILE).unwrap());
+    let white_bishop: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_BISHOP_FILE).unwrap());
+    let white_king: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KING_FILE).unwrap());
+    let white_knight: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KNIGHT_FILE).unwrap());
+    let white_pawn: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_PAWN_FILE).unwrap());
+    let white_queen: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_QUEEN_FILE).unwrap());
+    let white_rook: Texture2D =
+        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_ROOK_FILE).unwrap());
 
     let mut game = game::Game::default();
 
@@ -122,13 +132,28 @@ async fn main() {
 
         if let Some(mouse_square) = mouse_square_option {
             if is_mouse_button_pressed(MouseButton::Left) {
+                let piece_at_square = game.piece_at_square(&mouse_square);
                 if let Some(s) = selected_piece {
                     if s != mouse_square {
-                        game.request_move(&s, &mouse_square);
+                        if let Some(p) = piece_at_square {
+                            if p.color == game.turn {
+                                moving_piece = Some(mouse_square);
+                                selected_piece = Some(mouse_square);
+                            } else {
+                                game.request_move(&s, &mouse_square);
+                                moving_piece = None;
+                                selected_piece = None;
+                            }
+                        } else {
+                            game.request_move(&s, &mouse_square);
+                            moving_piece = None;
+                            selected_piece = None;
+                        }
+                    } else {
+                        moving_piece = None;
+                        selected_piece = None;
                     }
-                    moving_piece = None;
-                    selected_piece = None;
-                } else if let Some(p) = game.piece_at_square(&mouse_square) {
+                } else if let Some(p) = piece_at_square {
                     if p.color == game.turn {
                         moving_piece = Some(mouse_square);
                         selected_piece = Some(mouse_square);
@@ -177,6 +202,19 @@ async fn main() {
                         DARK_SQUARE
                     },
                 );
+                if col == 0 {
+                    draw_text_ex(
+                        todo!(),
+                        top_left.0 + col as f32 * square_size,
+                        top_left.1 + row as f32 * square_size,
+                        TextParams {
+                            font_size: 10,
+                            color: BLACK,
+                            font: Some(&font),
+                            ..Default::default()
+                        },
+                    );
+                }
                 if selected {
                     draw_rectangle(
                         top_left.0 + col as f32 * square_size,

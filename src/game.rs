@@ -123,6 +123,8 @@ pub struct Move {
     pub en_passant_capture: Option<Square>,
     // what square did the pawn double move over
     pub en_passant_target_square: Option<Square>,
+    // half move clock
+    pub halfmove_clock: u8,
 }
 
 impl Default for Move {
@@ -141,6 +143,7 @@ impl Default for Move {
             promotion: None,
             en_passant_capture: None,
             en_passant_target_square: None,
+            halfmove_clock: 0,
         }
     }
 }
@@ -170,6 +173,7 @@ impl Game {
             None => Some(Move {
                 from: *from,
                 to,
+                halfmove_clock: self.halfmove_clock + 1,
                 ..Default::default()
             }),
             Some(capture_piece) => {
@@ -344,6 +348,7 @@ impl Game {
                                     Color::White => Castling::WhiteKingside,
                                 }),
                                 losing_castle_rights: lose_all_castling,
+                                halfmove_clock: self.halfmove_clock + 1,
                                 ..Default::default()
                             })
                         }
@@ -466,7 +471,7 @@ impl Game {
                 for mv2 in self.legal_moves_on_square((row2, col2)) {
                     if let Some(c) = mv2.capture {
                         if c == PieceType::King {
-                            return true
+                            return true;
                         }
                     }
                 }
@@ -485,16 +490,16 @@ impl Game {
         // }
         !caps
     }
-    fn compute_legal_moves(&mut self, validate_king_moves:bool) {
+    fn compute_legal_moves(&mut self, validate_king_moves: bool) {
         let now = Instant::now();
         let mut legal_moves: [[Vec<Move>; 8]; 8] = Default::default();
         for row in 0i8..8 {
             for col in 0i8..8 {
                 // compute moves normally
-                let mut square_legal_moves = self.compute_legal_moves_on_square((row,col));
+                let mut square_legal_moves = self.compute_legal_moves_on_square((row, col));
 
                 if validate_king_moves {
-                    let before = square_legal_moves.len();
+                    // let before = square_legal_moves.len();
                     square_legal_moves.retain(|m| self.validate_move(m));
                     // println!("{} {}", before, legal_moves.len());
                 }
@@ -508,20 +513,14 @@ impl Game {
             let elapsed = now.elapsed();
             println!("Move computing took {:?}", elapsed);
         }
-
     }
     fn make_move(&mut self, mov: &Move) {
-        let piece = self.piece_at_square(&mov.from).unwrap();
         // full move clock
         if self.turn == Color::Black {
             self.fullmove_number += 1;
         }
         // half move clock
-        if mov.capture.is_some() || piece.piece_type == PieceType::Pawn {
-            self.halfmove_clock = 0;
-        } else {
-            self.halfmove_clock += 1;
-        }
+        self.halfmove_clock = mov.halfmove_clock;
         // en passant move
         self.en_passant_target_square = mov.en_passant_target_square;
         // en passant capture
@@ -569,12 +568,11 @@ impl Game {
             self.fullmove_number -= 1;
         }
         // half move clock
-        // TODO
-        // if mov.capture.is_some() || piece.piece_type == PieceType::Pawn {
-        //     self.halfmove_clock = 0;
-        // } else {
-        //     self.halfmove_clock += 1;
-        // }
+        self.halfmove_clock = match self.moves.last() {
+            None => 0,
+            Some(mv) => mv.halfmove_clock,
+        };
+
         // en passant move
         let last_move = self.moves.last();
         if let Some(lm) = last_move {

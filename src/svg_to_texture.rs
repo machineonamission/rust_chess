@@ -2,8 +2,6 @@
 // can't just install the package cause it installs an old version of macroquad and breaks shit
 use macroquad::{prelude::ImageFormat, texture::Texture2D};
 use resvg::usvg_text_layout::{fontdb, TreeTextToPath};
-use std::fs;
-
 const SIZE: u32 = 200;
 
 /*
