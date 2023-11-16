@@ -191,25 +191,39 @@ async fn main() {
                         selected = true;
                     }
                 }
+                let (color, inverse_color) = if row % 2 == col % 2 {
+                    (LIGHT_SQUARE, DARK_SQUARE)
+                } else {
+                    (DARK_SQUARE, LIGHT_SQUARE)
+                };
                 draw_rectangle(
                     top_left.0 + col as f32 * square_size,
                     top_left.1 + row as f32 * square_size,
                     square_size,
                     square_size,
-                    if row % 2 == col % 2 {
-                        LIGHT_SQUARE
-                    } else {
-                        DARK_SQUARE
-                    },
+                    color,
                 );
                 if col == 0 {
                     draw_text_ex(
-                        todo!(),
-                        top_left.0 + col as f32 * square_size,
-                        top_left.1 + row as f32 * square_size,
+                        &(8 - row).to_string(),
+                        top_left.0 + col as f32 * square_size + square_size / 50f32,
+                        top_left.1 + row as f32 * square_size + square_size / 5f32,
                         TextParams {
-                            font_size: 10,
-                            color: BLACK,
+                            font_size: (square_size / 5f32) as u16,
+                            color: inverse_color,
+                            font: Some(&font),
+                            ..Default::default()
+                        },
+                    );
+                }
+                if row == 7 {
+                    draw_text_ex(
+                        &"abcdefgh".chars().nth((col) as usize).unwrap().to_string(),
+                        top_left.0 + col as f32 * square_size + square_size * (6f32 / 7f32),
+                        top_left.1 + row as f32 * square_size + square_size * (49f32 / 50f32),
+                        TextParams {
+                            font_size: (square_size / 5f32) as u16,
+                            color: inverse_color,
                             font: Some(&font),
                             ..Default::default()
                         },
