@@ -1,12 +1,10 @@
 mod game;
-mod svg_to_texture;
 
 use glam::vec2;
 
 use crate::game::Color::White;
 use macroquad::prelude::*;
 
-use std::str;
 
 const BACKGROUND: Color = color_u8!(0x16, 0x14, 0x12, 0xff);
 const LIGHT_SQUARE: Color = color_u8!(0xf0, 0xd9, 0xb5, 0xff);
@@ -16,18 +14,18 @@ const SELECTED: Color = color_u8!(20, 85, 30, 0x7f);
 
 const FONT: &[u8] = include_bytes!("../assets/Atkinson-Hyperlegible-Bold-102.ttf");
 
-const BLACK_BISHOP_FILE: &[u8] = include_bytes!("../assets/bB.svg");
-const BLACK_KING_FILE: &[u8] = include_bytes!("../assets/bK.svg");
-const BLACK_KNIGHT_FILE: &[u8] = include_bytes!("../assets/bN.svg");
-const BLACK_PAWN_FILE: &[u8] = include_bytes!("../assets/bP.svg");
-const BLACK_QUEEN_FILE: &[u8] = include_bytes!("../assets/bQ.svg");
-const BLACK_ROOK_FILE: &[u8] = include_bytes!("../assets/bR.svg");
-const WHITE_BISHOP_FILE: &[u8] = include_bytes!("../assets/wB.svg");
-const WHITE_KING_FILE: &[u8] = include_bytes!("../assets/wK.svg");
-const WHITE_KNIGHT_FILE: &[u8] = include_bytes!("../assets/wN.svg");
-const WHITE_PAWN_FILE: &[u8] = include_bytes!("../assets/wP.svg");
-const WHITE_QUEEN_FILE: &[u8] = include_bytes!("../assets/wQ.svg");
-const WHITE_ROOK_FILE: &[u8] = include_bytes!("../assets/wR.svg");
+const BLACK_BISHOP_FILE: &[u8] = include_bytes!("../assets/bB.png");
+const BLACK_KING_FILE: &[u8] = include_bytes!("../assets/bK.png");
+const BLACK_KNIGHT_FILE: &[u8] = include_bytes!("../assets/bN.png");
+const BLACK_PAWN_FILE: &[u8] = include_bytes!("../assets/bP.png");
+const BLACK_QUEEN_FILE: &[u8] = include_bytes!("../assets/bQ.png");
+const BLACK_ROOK_FILE: &[u8] = include_bytes!("../assets/bR.png");
+const WHITE_BISHOP_FILE: &[u8] = include_bytes!("../assets/wB.png");
+const WHITE_KING_FILE: &[u8] = include_bytes!("../assets/wK.png");
+const WHITE_KNIGHT_FILE: &[u8] = include_bytes!("../assets/wN.png");
+const WHITE_PAWN_FILE: &[u8] = include_bytes!("../assets/wP.png");
+const WHITE_QUEEN_FILE: &[u8] = include_bytes!("../assets/wQ.png");
+const WHITE_ROOK_FILE: &[u8] = include_bytes!("../assets/wR.png");
 
 fn window_conf() -> Conf {
     Conf {
@@ -55,29 +53,29 @@ async fn main() {
     next_frame().await;
 
     let black_bishop: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_BISHOP_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_BISHOP_FILE, Some(ImageFormat::Png));
     let black_king: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KING_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_KING_FILE, Some(ImageFormat::Png));
     let black_knight: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_KNIGHT_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_KNIGHT_FILE, Some(ImageFormat::Png));
     let black_pawn: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_PAWN_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_PAWN_FILE, Some(ImageFormat::Png));
     let black_queen: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_QUEEN_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_QUEEN_FILE, Some(ImageFormat::Png));
     let black_rook: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(BLACK_ROOK_FILE).unwrap());
+        Texture2D::from_file_with_format(BLACK_ROOK_FILE, Some(ImageFormat::Png));
     let white_bishop: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_BISHOP_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_BISHOP_FILE, Some(ImageFormat::Png));
     let white_king: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KING_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_KING_FILE, Some(ImageFormat::Png));
     let white_knight: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_KNIGHT_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_KNIGHT_FILE, Some(ImageFormat::Png));
     let white_pawn: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_PAWN_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_PAWN_FILE, Some(ImageFormat::Png));
     let white_queen: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_QUEEN_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_QUEEN_FILE, Some(ImageFormat::Png));
     let white_rook: Texture2D =
-        svg_to_texture::svg_to_texture(str::from_utf8(WHITE_ROOK_FILE).unwrap());
+        Texture2D::from_file_with_format(WHITE_ROOK_FILE, Some(ImageFormat::Png));
 
     let mut game = game::Game::default();
 
